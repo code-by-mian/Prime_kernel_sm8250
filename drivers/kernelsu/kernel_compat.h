@@ -197,6 +197,10 @@ struct user_arg_ptr {
 	} ptr;
 };
 
+#ifndef untagged_addr
+#define untagged_addr(addr) (addr)
+#endif
+
 extern long copy_from_kernel_nofault(void *dst, const void *src, size_t size);
 
 /**
@@ -215,6 +219,10 @@ static __always_inline long ksu_copy_from_user_retry(void *to, const void __user
 	// we faulted! fallback to slow path
 	return copy_from_user(to, from, count);
 }
+
+#ifndef __nocfi
+#define __nocfi
+#endif
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(5, 2, 0) // caller is reponsible for sanity!
 static inline void ksu_zeroed_strncpy(char *dest, const char *src, size_t count)
@@ -308,10 +316,6 @@ static inline u64 ksu_ktime_get_ns(void) { return ktime_to_ns(ktime_get()); }
 #ifndef ALIGN_DOWN
 #define ALIGN_DOWN(x, a) __ALIGN_KERNEL((x) - ((a) - 1), (a))
 #endif
-#endif
-
-#ifndef untagged_addr
-#define untagged_addr(addr) (addr)
 #endif
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(4, 14, 0)
