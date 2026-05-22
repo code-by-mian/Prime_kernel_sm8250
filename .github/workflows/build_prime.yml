@@ -1,4 +1,4 @@
-name: Build Astro kernel
+name: Build Prime kernel
 
 on:
   workflow_dispatch:
