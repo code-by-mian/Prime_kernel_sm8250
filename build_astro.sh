@@ -8,25 +8,23 @@ build_kernel() {
     echo "Beginning kernel compilation for $DEVICE..."
     echo "-----------------------------------------------"
 
+    export ARCH=arm64
+    mkdir out
+
     # --- Platform setup ---
     export PROJECT_NAME="${DEVICE}"
     export PLATFORM_VERSION="${PLATFORM_VERSION:-11}"
-
-    export ARCH=arm64
-    mkdir out
 
     export PATH=$(pwd)/llvm-21/bin:$PATH
 
     BUILD_VAR="-j$(nproc) -C $(pwd) O=$(pwd)/out ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- LLVM=1 LLVM_IAS=1"
 
     # NO_QCACLD, CNSS_WORKAROUND, SEC_PCIE*: see vendor/samsung/${DEVICE}.config
-     cat arch/arm64/configs/vendor/kona-sec-perf_defconfig \
-        arch/arm64/configs/vendor/samsung/${DEVICE}.config \
-        arch/arm64/configs/vendor/not/no_werror.config \
+    cat arch/arm64/configs/vendor/kona-sec-perf_defconfig arch/arm64/configs/vendor/samsung/${DEVICE}.config \
+        arch/arm64/configs/ksu.config arch/arm64/configs/vendor/not/no_werror.config \
         arch/arm64/configs/vendor/debugfs.config > arch/arm64/configs/temp_defconfig
 
-    cat >> arch/arm64/configs/temp_defconfig <<EOF
-
+    echo "
 CONFIG_THINLTO=y
 # CONFIG_LTO_NONE is not set
 CONFIG_LTO_CLANG=y
