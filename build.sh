@@ -1,14 +1,19 @@
 #!/bin/sh
 
-export DEVICE=$1
+KERNEL_DIR=$(pwd)
+DEVICE="$1"
 
 build_kernel() {
     echo "-----------------------------------------------"
-    echo "Beginning kernel compilation..."
+    echo "Beginning kernel compilation for $DEVICE..."
     echo "-----------------------------------------------"
 
     export ARCH=arm64
     mkdir out
+
+    # --- Platform setup ---
+    export PROJECT_NAME="${DEVICE}"
+    export PLATFORM_VERSION="${PLATFORM_VERSION:-11}"
 
     export PATH=$(pwd)/llvm-21/bin:$PATH
 
@@ -20,9 +25,11 @@ build_kernel() {
         arch/arm64/configs/vendor/debugfs.config > arch/arm64/configs/temp_defconfig
 
     echo "
-    CONFIG_THINLTO=y
-    # CONFIG_LTO_NONE is not set
-    CONFIG_LTO_CLANG=y
+CONFIG_THINLTO=y
+# CONFIG_LTO_NONE is not set
+CONFIG_LTO_CLANG=y
+
+CONFIG_LOCALVERSION="-PrimeKernel"
     " >> arch/arm64/configs/temp_defconfig
 
     make $BUILD_VAR temp_defconfig || exit 1
