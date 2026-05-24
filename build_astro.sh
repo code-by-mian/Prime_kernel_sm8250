@@ -3,61 +3,61 @@
 KERNEL_DIR=$(pwd)
 DEVICE="$1"
 
-# --- Platform setup ---
-export ARCH=arm64
-mkdir -p out
-
-export PROJECT_NAME="${DEVICE}"
-export PLATFORM_VERSION="${PLATFORM_VERSION:-11}"
-
-export PATH=$(pwd)/llvm-21/bin:$PATH
-
-BUILD_VAR="-j$(nproc) -C $(pwd) O=$(pwd)/out ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- LLVM=1 LLVM_IAS=1"
-
-# --- Functions ---
 build_kernel() {
-    echo ">>> Building kernel for $DEVICE"
+    echo "-----------------------------------------------"
+    echo "Beginning kernel compilation for $DEVICE..."
+    echo "-----------------------------------------------"
 
-    cat arch/arm64/configs/vendor/kona-sec-perf_defconfig \
-        arch/arm64/configs/vendor/samsung/${DEVICE}.config \
-        arch/arm64/configs/vendor/not/no_werror.config \
-        arch/arm64/configs/ksu.config \
-        arch/arm64/configs/vendor/debugfs.config > arch/arm64/configs/temp_defconfig
+    export ARCH=arm64
+    mkdir out
 
-    cat >> arch/arm64/configs/temp_defconfig <<EOF
-# Enable ThinLTO for performance
+    export PATH=$(pwd)/llvm-21/bin:$PATH
+
+    BUILD_VAR="-j$(nproc) -C $(pwd) O=$(pwd)/out ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- LLVM=1 LLVM_IAS=1"
+
+    cat arch/arm64/configs/vendor/kona-sec-perf_defconfig arch/arm64/configs/vendor/samsung/$DEVICE.config \
+        arch/arm64/configs/ksu.config > arch/arm64/configs/temp_defconfig
+
+    echo "
 CONFIG_THINLTO=y
-CONFIG_LTO_CLANG=y
 # CONFIG_LTO_NONE is not set
+CONFIG_LTO_CLANG=y
 
-CONFIG_LOCALVERSION="-AstroKernel"
-EOF
+CONFIG_LOCALVERSION=\"-AstroKernel\"
+" >> arch/arm64/configs/temp_defconfig
 
-    make $BUILD_VAR temp_defconfig || exit 1
+    make $BUILD_VAR temp_defconfig
     rm arch/arm64/configs/temp_defconfig
 }
 
 build_dtb() {
-    echo ">>> Building dtb"
-    make $BUILD_VAR || exit 1
-    make $BUILD_VAR dtbs || exit 1
+    echo "-----------------------------------------------"
+    echo "Building dtb..."
+    echo "-----------------------------------------------"
+    make $BUILD_VAR
+    make $BUILD_VAR dtbs
 
-    cat out/arch/arm64/boot/dts/vendor/qcom/kona*.dtb > out/arch/arm64/boot/dts/dtb
+    cat "$(pwd)/out/arch/arm64/boot/dts/vendor/qcom/kona.dtb" \
+        "$(pwd)/out/arch/arm64/boot/dts/vendor/qcom/kona-v2.dtb" \
+        "$(pwd)/out/arch/arm64/boot/dts/vendor/qcom/kona-v2.1.dtb" \
+        > "$(pwd)/out/arch/arm64/boot/dts/dtb"
 }
 
 build_dtbo() {
-    echo ">>> Building dtbo.img"
-    DTBO_FILES=$(find out/arch/arm64/boot/dts/samsung/$DEVICE -name "kona-sec-$DEVICE-*.dtbo")
-    tools/mkdtimg create out/dtbo.img --page_size=4096 ${DTBO_FILES}
+    echo "-----------------------------------------------"
+    echo "Building dtbo.img..."
+    echo "-----------------------------------------------"
+    DTBO_FILES=$(find $(pwd)/out/arch/arm64/boot/dts/samsung/$DEVICE -name kona-sec-$DEVICE-*.dtbo)
+    $(pwd)/tools/mkdtimg create $(pwd)/out/dtbo.img --page_size=4096 ${DTBO_FILES}
 }
 
 prepare_ak3() {
     echo ">>> Packaging AnyKernel3"
     cd AnyKernel3/ || exit 1
 
-    cp "$KERNEL_DIR/out/dtbo.img" dtbo.img
-    cp "$KERNEL_DIR/out/arch/arm64/boot/Image" Image
-    cp "$KERNEL_DIR/out/arch/arm64/boot/dts/dtb" dtb
+    mv "$KERNEL_DIR/out/dtbo.img" dtbo.img
+    mv "$KERNEL_DIR/out/arch/arm64/boot/Image" Image
+    mv "$KERNEL_DIR/out/arch/arm64/boot/dts/dtb" dtb
 
     sed -i "s/^device\.name1=.*/device.name1=${DEVICE}/" anykernel.sh
 
