@@ -96,3 +96,5 @@ build_kernel
 build_dtb
 build_dtbo
 build_boot
+
+echo ">>> Build complete: boot.img and dtbo.img generated."
