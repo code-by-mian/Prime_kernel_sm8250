@@ -46,8 +46,8 @@ jobs:
 
       - name: Build kernel
         run: |
-          chmod +x build_prime1.sh
-          bash build_prime1.sh "${{ matrix.device }}"
+          chmod +x build_boot.sh
+          bash build_boot.sh "${{ matrix.device }}"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
