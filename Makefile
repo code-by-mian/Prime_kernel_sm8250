@@ -372,10 +372,10 @@ else
 HOSTCC	= gcc
 HOSTCXX	= g++
 endif
-KBUILD_HOSTCFLAGS   := -Wall -Wmissing-prototypes -Wstrict-prototypes -O2 \
+KBUILD_HOSTCFLAGS   := -Wall -Wmissing-prototypes -Wstrict-prototypes -O3 \
 		-fomit-frame-pointer -std=gnu89 $(HOST_LFS_CFLAGS) \
 		$(HOSTCFLAGS)
-KBUILD_HOSTCXXFLAGS := -O2 $(HOST_LFS_CFLAGS) $(HOSTCXXFLAGS)
+KBUILD_HOSTCXXFLAGS := -O3 $(HOST_LFS_CFLAGS) $(HOSTCXXFLAGS)
 KBUILD_HOSTLDFLAGS  := $(HOST_LFS_LDFLAGS) $(HOSTLDFLAGS)
 KBUILD_HOSTLDLIBS   := $(HOST_LFS_LIBS) $(HOSTLDLIBS)
 
@@ -717,11 +717,59 @@ KBUILD_CFLAGS	+= $(call cc-disable-warning, address-of-packed-member)
 ifdef CONFIG_CC_OPTIMIZE_FOR_SIZE
 KBUILD_CFLAGS   += -Os
 else
-KBUILD_CFLAGS   += -O2
+KBUILD_CFLAGS   += -O3
 endif
+
+ifneq ($(filter y, \
+	$(CONFIG_ARCH_KONA) \
+	$(CONFIG_ARCH_LITO) \
+	$(CONFIG_ARCH_LAGOON)),)
+KBUILD_CFLAGS   += $(call cc-option,-mcpu=cortex-a55)
+KBUILD_AFLAGS   += $(call cc-option,-mcpu=cortex-a55)
+KBUILD_LDFLAGS  += $(call cc-option,-mllvm -mcpu=cortex-a55)
+else ifneq ($(filter y, \
+	$(CONFIG_ARCH_BENGAL) \
+	$(CONFIG_ARCH_KHAJE) \
+	$(CONFIG_ARCH_SCUBA) \
+	$(CONFIG_ARCH_QM215) \
+	$(CONFIG_ARCH_MSM8937) \
+	$(CONFIG_ARCH_SDM660) \
+	$(CONFIG_ARCH_SDM429) \
+	$(CONFIG_ARCH_SDM439) \
+	$(CONFIG_ARCH_MSM8953) \
+	$(CONFIG_ARCH_SDM450)),)
+KBUILD_CFLAGS   += $(call cc-option,-mcpu=cortex-a53)
+KBUILD_AFLAGS   += $(call cc-option,-mcpu=cortex-a53)
+KBUILD_LDFLAGS  += $(call cc-option,-mllvm -mcpu=cortex-a53)
+endif
+
+# Enable fast FMA optimizations
+KBUILD_CFLAGS += $(call cc-option,-ffp-contract=fast)
+
+# Enable hot cold split optimization
+KBUILD_CFLAGS += $(call cc-option,-mllvm -hot-cold-split=true)
+
+# Enable MLGO for register allocation
+KBUILD_LDFLAGS += $(call cc-option,-mllvm -regalloc-enable-advisor=default)
 
 ifdef CONFIG_CC_WERROR
 KBUILD_CFLAGS  += -Werror
+endif
+
+ifdef CONFIG_LLVM_POLLY
+KBUILD_CFLAGS += $(call cc-option,-mllvm -polly)
+KBUILD_CFLAGS += $(call cc-option,-mllvm -polly-ast-use-context)
+KBUILD_CFLAGS += $(call cc-option,-mllvm -polly-invariant-load-hoisting)
+KBUILD_CFLAGS += $(call cc-option,-mllvm -polly-isl-arg=--no-schedule-serialize-sccs)
+KBUILD_CFLAGS += $(call cc-option,-mllvm -polly-loopfusion-greedy=1)
+KBUILD_CFLAGS += $(call cc-option,-mllvm -polly-num-threads=0)
+KBUILD_CFLAGS += $(call cc-option,-mllvm -polly-omp-backend=LLVM)
+KBUILD_CFLAGS += $(call cc-option,-mllvm -polly-postopts=1)
+KBUILD_CFLAGS += $(call cc-option,-mllvm -polly-reschedule=1)
+KBUILD_CFLAGS += $(call cc-option,-mllvm -polly-run-inliner)
+KBUILD_CFLAGS += $(call cc-option,-mllvm -polly-scheduling-chunksize=1)
+KBUILD_CFLAGS += $(call cc-option,-mllvm -polly-scheduling=dynamic)
+KBUILD_CFLAGS += $(call cc-option,-mllvm -polly-vectorizer=stripmine)
 endif
 
 # Tell gcc to never replace conditional load with a non-conditional one
@@ -786,6 +834,14 @@ endif
 # These warnings generated too much noise in a regular build.
 # Use make W=1 to enable them (see scripts/Makefile.extrawarn)
 KBUILD_CFLAGS += $(call cc-disable-warning, unused-but-set-variable)
+
+ifdef CONFIG_LTO_CLANG
+KBUILD_LDFLAGS += -O3 --lto-O3
+LDFLAGS += -O3 --lto-O3
+else
+KBUILD_LDFLAGS += -O3
+LDFLAGS += -O3
+endif
 
 KBUILD_CFLAGS += $(call cc-disable-warning, unused-const-variable)
 
@@ -990,6 +1046,7 @@ KBUILD_CFLAGS  += $(call cc-option,-fno-stack-check,)
 
 # disallow errors like 'EXPORT_GPL(foo);' with missing header
 KBUILD_CFLAGS   += $(call cc-option,-Werror=implicit-int)
+
 
 # Prohibit date/time macros, which would make the build non-deterministic
 KBUILD_CFLAGS   += $(call cc-option,-Werror=date-time)
