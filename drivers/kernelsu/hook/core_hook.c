@@ -43,80 +43,6 @@ LSM_HANDLER_TYPE ksu_file_permission(struct file *file, int mask)
 	return 0;
 }
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 14, 0) && LINUX_VERSION_CODE >= KERNEL_VERSION(4, 2, 0)
-
-static uintptr_t cap_bprm_set_creds_slot __read_mostly = NULL;
-extern int cap_bprm_set_creds(struct linux_binprm *bprm);
-
-static __nocfi int ksu_bprm_set_creds(struct linux_binprm *bprm)
-{
-	if (likely(ksu_boot_completed))
-		goto capability_fn;
-
-	if (likely(!is_init(current_cred())))
-		goto capability_fn;
-
-	if (!bprm->filename)
-		goto capability_fn;
-
-	if (!!strcmp(bprm->filename, "/data/adb/ksud"))
-		goto capability_fn;
-
-	pr_info("bprm_set_creds: escape init executing %s with pid: %d\n", bprm->filename, current->pid);
-	escape_to_root_forced(); // give this context all permissions
-
-capability_fn:
-	return cap_bprm_set_creds(bprm);
-}
-
-static struct security_hook_list ksu_hooks_bprm_set_creds[] __ro_after_init = {
-	LSM_HOOK_INIT(bprm_set_creds, ksu_bprm_set_creds),
-};
-
-static int ksu_restore_bprm_set_creds(void *data)
-{
-	set_user_nice(current, 19); // low prio
-
-loop_start:
-	msleep(5000);
-	if (!*(volatile bool *)&ksu_boot_completed)
-		goto loop_start;
-
-	msleep(1000);
-
-	// now we write capability back into its slot
-	uintptr_t addr = cap_bprm_set_creds_slot;
-	uintptr_t base = addr & PAGE_MASK;
-	uintptr_t offset = addr & ~PAGE_MASK;
-
-	struct page *page = phys_to_page(__pa(base));
-	if (!page)
-		return 0;
-
-	void *writable_addr = vmap(&page, 1, VM_MAP, PAGE_KERNEL);
-	if (!writable_addr)
-		return 0;
-
-	void **target_slot = (void **)(writable_addr + offset);
-				
-	preempt_disable();
-	local_irq_disable();
-					
-	WRITE_ONCE(*target_slot, (uintptr_t)cap_bprm_set_creds);
-					
-	local_irq_enable();
-	preempt_enable();
-
-	vunmap(writable_addr);
-	smp_mb();
-	
-	pr_info("ksu_bprm_set_creds: restored cap_bprm_set_creds: *0x%lx = 0x%lx\n", (uintptr_t)addr, *(uintptr_t *)addr);
-
-	return 0;
-}
-
-#endif
-
 #ifdef CONFIG_KSU_LSM_SECURITY_HOOKS
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 2, 0)
 static struct security_hook_list ksu_hooks[] __ro_after_init = {
@@ -294,59 +220,6 @@ static inline void ksu_security_delete_hooks(struct security_hook_list *hooks, i
 		ksu_hlist_del_safe(&hooks[i].list);
 }
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 14, 0)
-static void ksu_grab_cap_bprm_set_creds_slot()
-{
-	struct hlist_head *head = ksu_hooks_bprm_set_creds[0].head; 
-	struct security_hook_list *pos;
-	struct hlist_node *tmp;
-
-	if (!head)
-		return;
-
-	hlist_for_each_entry_safe(pos, tmp, head, list) {
-		// look for capabilities
-		if (pos->hook.bprm_set_creds != cap_bprm_set_creds)
-			continue;
-
-		cap_bprm_set_creds_slot = &pos->hook.bprm_set_creds;
-		pr_info("ksu_bprm_set_creds: found cap_bprm_set_creds slot at 0x%lx\n", (uintptr_t)cap_bprm_set_creds_slot);
-	}
-	
-	// now that we got the slot, we can unreg ourself
-	ksu_security_delete_hooks(ksu_hooks_bprm_set_creds, ARRAY_SIZE(ksu_hooks_bprm_set_creds));
-	
-	// then we write our fn ptr over on capability slot
-	uintptr_t addr = cap_bprm_set_creds_slot;
-	uintptr_t base = addr & PAGE_MASK;
-	uintptr_t offset = addr & ~PAGE_MASK;
-
-	struct page *page = phys_to_page(__pa(base));
-	if (!page)
-		return;
-
-	void *writable_addr = vmap(&page, 1, VM_MAP, PAGE_KERNEL);
-	if (!writable_addr)
-		return;
-
-	void **target_slot = (void **)((unsigned long)writable_addr + offset);
-
-	preempt_disable();
-	local_irq_disable();
-					
-	FORCE_VOLATILE(*target_slot) = (void *)ksu_bprm_set_creds;
-					
-	local_irq_enable();
-	preempt_enable();
-
-	vunmap(writable_addr);
-	smp_mb();
-
-	pr_info("ksu_bprm_set_creds: cap_bprm_set_creds hijacked!\n");
-
-}
-#endif
-
 static void ksu_dethrone_selinux_setprocattr()
 {
 	struct hlist_head *head = ksu_hooks_setprocattr[0].head; 
@@ -452,61 +325,6 @@ static inline void ksu_security_delete_hooks(struct security_hook_list *hooks, i
 		ksu_list_del_safe(&hooks[i].list);
 }
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 14, 0)
-static void ksu_grab_cap_bprm_set_creds_slot()
-{
-	struct list_head *head = ksu_hooks_bprm_set_creds[0].head;
-	struct security_hook_list *pos, *tmp;
-
-	if (!head)
-		return;
-
-	if (list_empty(head))
-		return;
-
-	list_for_each_entry_safe(pos, tmp, head, list) {
-		// look for capabilities
-		if (pos->hook.bprm_set_creds != cap_bprm_set_creds)
-			continue;
-
-		cap_bprm_set_creds_slot = &pos->hook.bprm_set_creds;
-		pr_info("ksu_bprm_set_creds: found cap_bprm_set_creds slot at 0x%lx\n", (uintptr_t)cap_bprm_set_creds_slot);
-	}
-	
-	// now that we got the slot, we can unreg ourself
-	ksu_security_delete_hooks(ksu_hooks_bprm_set_creds, ARRAY_SIZE(ksu_hooks_bprm_set_creds));
-	
-	// then we write our fn ptr over on capability slot
-	uintptr_t addr = cap_bprm_set_creds_slot;
-	uintptr_t base = addr & PAGE_MASK;
-	uintptr_t offset = addr & ~PAGE_MASK;
-
-	struct page *page = phys_to_page(__pa(base));
-	if (!page)
-		return;
-
-	void *writable_addr = vmap(&page, 1, VM_MAP, PAGE_KERNEL);
-	if (!writable_addr)
-		return;
-
-	void **target_slot = (void **)((unsigned long)writable_addr + offset);
-
-	preempt_disable();
-	local_irq_disable();
-					
-	FORCE_VOLATILE(*target_slot) = (void *)ksu_bprm_set_creds;
-					
-	local_irq_enable();
-	preempt_enable();
-
-	vunmap(writable_addr);
-	smp_mb();
-
-	pr_info("ksu_bprm_set_creds: cap_bprm_set_creds hijacked!\n");
-
-}
-#endif
-
 static void ksu_dethrone_selinux_setprocattr()
 {
 	struct list_head *head = ksu_hooks_setprocattr[0].head;
@@ -565,12 +383,6 @@ static __init void ksu_lsm_hook_init(void)
 	kthread_run(ksu_lsm_hook_restore, NULL, "kthread");
 #endif
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 14, 0)
-	ksu_security_add_hooks(ksu_hooks_bprm_set_creds, ARRAY_SIZE(ksu_hooks_bprm_set_creds), "ksu");
-	ksu_grab_cap_bprm_set_creds_slot();
-	kthread_run(ksu_restore_bprm_set_creds, NULL, "kthread");
-#endif
-
 	ksu_security_add_hooks(ksu_hooks_setprocattr, ARRAY_SIZE(ksu_hooks_setprocattr), SETPROCATTR_HOOK_NAME);
 	ksu_dethrone_selinux_setprocattr();
 }
@@ -617,45 +429,6 @@ static int hook_file_permission(struct file *file, int mask)
 
 	ksu_file_permission(file, mask);
 	return orig_file_permission(file, mask);
-}
-
-static int (*orig_bprm_set_creds)(struct linux_binprm *bprm) __read_mostly = NULL;
-static int ksu_unregister_bprm_set_creds(void *data)
-{
-	struct security_operations *ops = (struct security_operations *)selinux_ops_addr;
-	if (!orig_bprm_set_creds)
-		return 0;
-
-	pr_info("%s: restoring: bprm_set_creds 0x%lx -> 0x%lx\n", __func__, (long)ops->bprm_set_creds, (long)orig_bprm_set_creds);
-	ops->bprm_set_creds = orig_bprm_set_creds;
-
-	return 0;
-}
-
-static int hook_bprm_set_creds(struct linux_binprm *bprm)
-{
-	if (ksu_boot_completed)
-		goto unreg_bprm_set_creds;
-
-	if (!is_init(current_cred()))
-		goto bprm_set_creds;
-
-	if (!bprm->filename)
-		goto bprm_set_creds;
-
-	if (!!strcmp(bprm->filename, "/data/adb/ksud"))
-		goto bprm_set_creds;
-
-	pr_info("bprm_set_creds: escape init executing %s with pid: %d\n", bprm->filename, current->pid);
-	escape_to_root_forced(); // give this context all permissions
-
-	goto bprm_set_creds;
-
-unreg_bprm_set_creds:
-	stop_machine(ksu_unregister_bprm_set_creds, NULL, NULL);
-
-bprm_set_creds:
-	return orig_bprm_set_creds(bprm);
 }
 
 static inline bool verify_selinux_cred_free(void *fn_ptr)

@@ -56,12 +56,12 @@ static inline bool ksu_should_destroy_context(char *str)
 	if (!str)
 		return false;
 
-	down_read(&ksu_sepolicy_shitlist_lock);
+	read_lock(&ksu_sepolicy_shitlist_lock);
 
 	struct ksu_type_node *t_node;
 	list_for_each_entry(t_node, &ksu_hide_type_list, list) {
 		if (strstr(str, t_node->padded_name)) {
-			up_read(&ksu_sepolicy_shitlist_lock);
+			read_unlock(&ksu_sepolicy_shitlist_lock);
 			return true;
 		}
 	}
@@ -69,19 +69,19 @@ static inline bool ksu_should_destroy_context(char *str)
 	// double strstr
 	char *str2 = strchr(str, ' ');
 	if (!str2) {
-		up_read(&ksu_sepolicy_shitlist_lock);
+		read_unlock(&ksu_sepolicy_shitlist_lock);
 		return false;
 	}		
 
 	struct ksu_rule_node *r_node;
 	list_for_each_entry(r_node, &ksu_hide_rule_list, list) {
 		if (strstr(str, r_node->src) && strstr(str2, r_node->tgt)) {
-			up_read(&ksu_sepolicy_shitlist_lock);
+			read_unlock(&ksu_sepolicy_shitlist_lock);
 			return true;
 		}
 	}
 
-	up_read(&ksu_sepolicy_shitlist_lock);
+	read_unlock(&ksu_sepolicy_shitlist_lock);
 	return false;
 }
 
@@ -324,16 +324,20 @@ bail_out:
 // init kthread
 static int ksu_hide_init_thread(void *data)
 {
+	unsigned int i = 0;
+
 	set_user_nice(current, 19); // low prio
 
 start:
-	// in input hook got turned off means we have ksud!
-	if (!*(volatile bool *)&ksu_input_hook)
+	if (!!*(volatile bool *)&ksu_boot_completed)
 		goto bail;
 
 	msleep(5000);
 
-	goto start;
+	i++;
+
+	if (i < 12)
+		goto start;
 
 bail:
 	;
@@ -347,9 +351,9 @@ bail:
 	const char *init_adb_args[] = { "init", "adb_data_file", NULL };
 	ksu_add_shit_to_list(KSU_SEPOLICY_CMD_NORMAL_PERM, init_adb_args);
 
-	// we move this to a module instead
-	// const char *adbroot_args[] = { "adbroot", NULL };
-	// ksu_add_shit_to_list(KSU_SEPOLICY_CMD_TYPE, adbroot_args);
+	// extra, but lets take care of this
+	const char *adbroot_args[] = { "adbroot", NULL };
+	ksu_add_shit_to_list(KSU_SEPOLICY_CMD_TYPE, adbroot_args);
 
 	ksu_selinux_hide_enable();
 	

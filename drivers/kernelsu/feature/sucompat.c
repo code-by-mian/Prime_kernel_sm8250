@@ -244,6 +244,7 @@ SUCOMPAT_HOOK_TYPE ksu_handle_stat(int *dfd, const char __user **filename_user, 
 // sys_execve, compat_sys_execve
 SUCOMPAT_HOOK_TYPE ksu_handle_execve(const char __user **filename_user, void *argv, void *envp)
 {
+	sys_execve_escape_ksud((void *)filename_user);
 
 #ifdef CONFIG_KSU_FEATURE_ADBROOT
 	ksu_adb_root_handle_execve((void *)filename_user, (void *)envp);
@@ -259,6 +260,7 @@ SUCOMPAT_HOOK_TYPE ksu_handle_execve(const char __user **filename_user, void *ar
 #ifndef CONFIG_KSU_TAMPER_SYSCALL_TABLE
 static __always_inline void ksu_sucompat_kernel_common(void **filename_ptr, void *argv, void *envp, const char *function_name)
 {
+	kernel_execve_escape_ksud((void *)filename_ptr);
 
 #ifdef CONFIG_KSU_FEATURE_ADBROOT
 	ksu_adb_root_handle_execveat((void *)filename_ptr, (void *)envp);
