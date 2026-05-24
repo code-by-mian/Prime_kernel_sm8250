@@ -415,8 +415,7 @@ out:
 // us to have our own context. we give it a full escaped-to-root one.
 static int persistent_allow_list_pre(void *data)
 {
-	if (IS_ENABLED(CONFIG_KSU_DEBUG))
-		pr_info("do_persistent_allow_list: pid: %d started\n", current->pid);
+	pr_info("do_persistent_allow_list: pid: %d started\n", current->pid);
 
 	/**
 	 * repurpose the mutex they were holding on ksu_persistent_allow_list_fn
@@ -433,8 +432,7 @@ static int persistent_allow_list_pre(void *data)
 
 	mutex_unlock(&allowlist_mutex);
 
-	if (IS_ENABLED(CONFIG_KSU_DEBUG))
-		pr_info("do_persistent_allow_list: pid: %d exit\n", current->pid);
+	pr_info("do_persistent_allow_list: pid: %d exit\n", current->pid);
 	return 0;
 }
 

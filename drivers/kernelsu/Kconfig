@@ -12,7 +12,7 @@ config KSU
 config KSU_KPROBES_KSUD
 	bool "Enable dynamic kprobes for early boot hooks"
 	depends on KPROBES && KRETPROBES
-	default n
+	default y
 	help
 	  Use dynamic hooks via kprobes for functions only
 	  on early boot. Hooks are unregistered at boot complete
@@ -21,7 +21,7 @@ config KSU_KPROBES_KSUD
 config KSU_TAMPER_SYSCALL_TABLE
 	bool "EXPERIMENTAL: tamper sys_call_table for sucompat + sys_reboot"
 	depends on (ARM || ARM64) && !CFI_CLANG && !CFI
-	default y
+	default n
 	help
 	  EXPERIMENTAL: use syscall table hijacking method demonstrated on zx2c4's
 	  kernel-assisted-superuser. Replaces sys_reboot, sys_execve, sys_newfstatat,
@@ -41,13 +41,6 @@ config KSU_FEATURE_ADBROOT
 	default y
 	help
 	  Build KernelSU's adb root feature.
-
-config KSU_FEATURE_ADBROOT_DEFAULT_ENABLE
-	bool "Enable KernelSU ADB Root feature by default"
-	depends on KSU_FEATURE_ADBROOT
-	default n
-	help
-	  Turn KernelSU's adb root feature on by default.
 
 config KSU_DEBUG
 	bool "KernelSU debug mode"
