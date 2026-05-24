@@ -1,4 +1,4 @@
-name: Build Astro Core kernel
+name: Build Astro boot.img
 
 on:
   workflow_dispatch:
@@ -8,14 +8,14 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        device: [ y2q, x1q, z3q]
+        device: [ y2q, x1q, z3q ]
 
     steps:
       - name: Checkout repository (with submodules)
         uses: actions/checkout@v5
         with:
           fetch-depth: 1
-          submodules: recursive   # <-- ensures mkbootimg submodule is pulled
+          submodules: recursive   # ensures mkbootimg submodule is pulled
 
       - name: Install build tools
         run: |
@@ -49,8 +49,16 @@ jobs:
           chmod +x build_boot.sh
           bash build_boot.sh "${{ matrix.device }}"
 
+      - name: Package artifacts
+        run: |
+          zip -r AstroKernel-${{ matrix.device }}.zip \
+            boot.img \
+            dtbo.img \
+            out/dtb.img \
+            out/arch/arm64/boot/Image
+
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Astro-Kernel-${{ matrix.device }}
-          path: "*.zip"
+          name: AstroKernel-${{ matrix.device }}
+          path: AstroKernel-${{ matrix.device }}.zip
