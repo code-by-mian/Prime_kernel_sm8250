@@ -3,20 +3,19 @@
 KERNEL_DIR=$(pwd)
 DEVICE="$1"
 
+# --- Functions ---
 build_kernel() {
     echo "-----------------------------------------------"
     echo "Beginning kernel compilation for $DEVICE..."
     echo "-----------------------------------------------"
 
     export ARCH=arm64
-    mkdir out
+    mkdir -p out
 
     export PATH=$(pwd)/llvm-21/bin:$PATH
 
     BUILD_VAR="-j$(nproc) -C $(pwd) O=$(pwd)/out ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- LLVM=1 LLVM_IAS=1"
 
-# --- Functions ---
-build_kernel() {
     echo ">>> Building kernel for $DEVICE"
 
     cat arch/arm64/configs/vendor/kona-sec-perf_defconfig \
@@ -54,7 +53,7 @@ build_dtbo() {
 
 prepare_ak3() {
     echo ">>> Packaging AnyKernel3"
-    cd AnyKernel3/
+    cd AnyKernel3/ || exit 1
 
     cp "$KERNEL_DIR/out/dtbo.img" dtbo.img
     cp "$KERNEL_DIR/out/arch/arm64/boot/Image" Image
