@@ -1,30 +1,19 @@
-#!/bin/bash
-set -euo pipefail
+#!/bin/sh
 
 KERNEL_DIR=$(pwd)
-DEVICE="$1"   # default device if not passed
+DEVICE="$1"
 
-# --- Toolchain setup ---
-if [ -z "${KERNEL_LLVM_BIN:-}" ] || [ ! -x "$KERNEL_LLVM_BIN" ]; then
-    echo "Error: Neutron Clang toolchain not found. Exiting."
-    exit 1
-fi
+build_kernel() {
+    echo "-----------------------------------------------"
+    echo "Beginning kernel compilation for $DEVICE..."
+    echo "-----------------------------------------------"
 
-export PATH="$(dirname "$KERNEL_LLVM_BIN"):$PATH"
-export LD=ld.lld
+    export ARCH=arm64
+    mkdir out
 
-# --- Platform setup ---
-export PROJECT_NAME="${DEVICE}"
-export PLATFORM_VERSION="${PLATFORM_VERSION:-11}"
+    export PATH=$(pwd)/llvm-21/bin:$PATH
 
-# --- Build variables ---
-export ARCH=arm64
-mkdir -p out
-
-# Safer flags for Neutron Clang
-export KBUILD_CFLAGS="-O2 -Wno-default-const-init-var-unsafe"
-
-BUILD_VAR="-j$(nproc) -C $KERNEL_DIR O=$KERNEL_DIR/out ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- LLVM=1 LLVM_IAS=1"
+    BUILD_VAR="-j$(nproc) -C $(pwd) O=$(pwd)/out ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- LLVM=1 LLVM_IAS=1"
 
 # --- Functions ---
 build_kernel() {
