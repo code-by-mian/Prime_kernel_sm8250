@@ -25,7 +25,7 @@ CONFIG_THINLTO=y
 # CONFIG_LTO_NONE is not set
 CONFIG_LTO_CLANG=y
 
-CONFIG_LOCALVERSION="-PrimeKernel"
+CONFIG_LOCALVERSION="-AstroKernel"
     " >> arch/arm64/configs/temp_defconfig
 
     make $BUILD_VAR temp_defconfig
