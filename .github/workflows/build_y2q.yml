@@ -4,21 +4,23 @@ on:
   workflow_dispatch:
     inputs:
       release:
-          description: 'Upload release'
-          type: boolean
-          required: true
-          default: false
+        description: 'Upload release'
+        type: boolean
+        required: true
+        default: false
       changelog:
-          description: 'Changelog'
-          type: string
-          required: false
+        description: 'Changelog'
+        type: string
+        required: false
+
+permissions:
+  contents: write
 
 jobs:
   prepare:
     runs-on: ubuntu-latest
     outputs:
       release_ts: ${{ steps.ts.outputs.release_ts }}
-
     steps:
       - name: Generate release date
         id: ts
@@ -31,12 +33,10 @@ jobs:
     outputs:
       release_ts: ${{ steps.ts.outputs.release_ts }}
     needs: prepare
-
     strategy:
       matrix:
         device:
           - { name: y2q, name2: y2qxx, name3: y2qxxx }
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v5
@@ -75,11 +75,10 @@ jobs:
         if: matrix.device.name == 'y2q'
         run: |
           : > version.txt
-          echo "**Kernel version:** $(cat out/include/config/kernel.release)  " >> version.txt
+          echo "**Kernel version:** $(cat out/include/config/kernel.release) " >> version.txt
           echo >> version.txt
           export KHASH="$(git rev-parse HEAD)"
           echo "**Kernel source:** [$KHASH](https://github.com/pascua28/android_kernel_samsung_sm8250/tree/$KHASH)" >> version.txt
-
           if [ "${{ github.event.inputs.release }}" = "true" ] && \
              [ -n "${{ github.event.inputs.changelog }}" ]; then
             echo >> version.txt
@@ -106,7 +105,6 @@ jobs:
     needs: [prepare, build]
     if: github.event.inputs.release == 'true'
     runs-on: ubuntu-latest
-
     steps:
       - name: Download build artifacts
         uses: actions/download-artifact@v4
@@ -117,10 +115,7 @@ jobs:
         run: |
           cd artifacts
           for dir in PrimeKernel-*; do
-            (
-              cd "$dir"
-              zip -r "../${dir}.zip" .
-            )
+            ( cd "$dir" && zip -r "../${dir}.zip" . )
           done
 
       - name: Download release version
