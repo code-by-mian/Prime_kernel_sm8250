@@ -489,19 +489,14 @@ config SCHED_WALT
 	used to guide task placement as well as task frequency requirements
 	for cpufreq governors.
 
-config SCHED_SEC_TASK_BOOST
-	bool "Enable Task Priority Boost"
-	depends on SCHED_WALT
-	default n
-	help
-	  This feature will boost task based on priority(=nice) value.
-	  If task has higher priority than "/proc/perf_reserve",
-	  give a chance to migrate to prime cluster more and
-	  advantage of preemption.
-
 config HAVE_SCHED_AVG_IRQ
 	def_bool y
 	depends on IRQ_TIME_ACCOUNTING || PARAVIRT_TIME_ACCOUNTING
+	depends on SMP
+
+config SCHED_THERMAL_PRESSURE
+	default y
+	bool "Enable periodic averaging of thermal pressure"
 	depends on SMP
 
 config BSD_PROCESS_ACCT
@@ -823,6 +818,41 @@ config UCLAMP_BUCKETS_COUNT
 	  If in doubt, use the default value.
 
 endmenu
+
+menu "FAIR Scheuler tunables"
+
+choice
+	prompt "Utilization's PELT half-Life"
+	default PELT_UTIL_HALFLIFE_32
+	help
+	  Allows choosing one of the possible values for the PELT half-life to
+	  be used for the update of the utilization of tasks and CPUs.
+	  The half-life is the amount of [ms] required by the PELT signal to
+	  build up to 50% utilization. The higher the half-life the longer it
+	  takes for a task to be represented as a big one.
+
+	  If not sure, use the default of 32 ms.
+
+config PELT_UTIL_HALFLIFE_32
+	bool "32 ms, default for server"
+
+config PELT_UTIL_HALFLIFE_16
+	bool "16 ms, suggested for interactive workloads"
+	help
+	  Use 16ms as PELT half-life value. This will increase the ramp-up and
+	  decay of utlization and load twice as fast as for the default
+	  configuration using 32ms.
+
+config PELT_UTIL_HALFLIFE_8
+	bool "8 ms, very fast"
+	help
+	  Use 8ms as PELT half-life value. This will increase the ramp-up and
+	  decay of utlization and load four time as fast as for the default
+	  configuration using 32ms.
+
+endchoice
+
+endmenu # FAIR Scheduler tunables"
 
 #
 # For architectures that want to enable the support for NUMA-affine scheduler
@@ -1226,6 +1256,31 @@ config CHECKPOINT_RESTORE
 	  entries.
 
 	  If unsure, say N here.
+
+config SCHED_CASS
+	bool "Capacity Aware Superset Scheduler"
+	depends on SMP
+	help
+	  This enables the Capacity Aware Superset Scheduler (CASS), which
+	  optimizes runqueue selection of CFS tasks. By using CPU capacity as a
+	  basis for comparing the relative utilization between different CPUs,
+	  CASS fairly balances load across CPUs of varying capacities. This
+	  results in improved multi-core performance, especially when CPUs are
+	  overutilized because CASS doesn't clip a CPU's utilization when it
+	  eclipses the CPU's capacity.
+
+	  As a superset of capacity aware scheduling, CASS implements a
+	  hierarchy of criteria to determine the better CPU to wake a task upon
+	  between CPUs that have the same relative utilization. This way,
+	  single-core performance, latency, and cache affinity are all optimized
+	  where possible.
+
+	  CASS doesn't feature explicit energy awareness but its basic load
+	  balancing principle results in decreased overall energy, often better
+	  than what is possible with explicit energy awareness. By fairly
+	  balancing load based on relative utilization, all CPUs are kept at
+	  their lowest P-state necessary to satisfy the overall load at any
+	  given moment.
 
 config SCHED_AUTOGROUP
 	bool "Automatic process group scheduling"
