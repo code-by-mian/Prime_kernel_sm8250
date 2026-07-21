@@ -8,10 +8,6 @@ on:
         type: boolean
         required: true
         default: false
-      changelog:
-        description: 'Changelog'
-        type: string
-        required: false
 
 permissions:
   contents: write
@@ -75,22 +71,19 @@ jobs:
         if: matrix.device.name == 'y2q'
         run: |
           : > version.txt
-          echo "**Kernel version:** $(cat out/include/config/kernel.release) " >> version.txt
+          echo "**Kernel version:** $(cat out/include/config/kernel.release)" >> version.txt
           echo >> version.txt
           export KHASH="$(git rev-parse HEAD)"
           echo "**Kernel source:** [$KHASH](https://github.com/pascua28/android_kernel_samsung_sm8250/tree/$KHASH)" >> version.txt
-          if [ "${{ github.event.inputs.release }}" = "true" ] && \
-             [ -n "${{ github.event.inputs.changelog }}" ]; then
-            echo >> version.txt
-            echo "**Changelog:**" >> version.txt
-            echo >> version.txt
-            printf "%b\n" "${{ github.event.inputs.changelog }}" >> version.txt
-          fi
+          echo >> version.txt
+          echo "**Changelog:**" >> version.txt
+          echo >> version.txt
+          cat CHANGELOG.txt >> version.txt
 
       - name: Upload artifact
         uses: actions/upload-artifact@v5
         with:
-          name: AstroKernel-${{ matrix.device.name }}-${{ needs.prepare.outputs.release_ts }}
+          name: PrimeKernel-${{ matrix.device.name }}-${{ needs.prepare.outputs.release_ts }}
           path: AnyKernel3/
 
       - name: Upload release notes
@@ -114,7 +107,7 @@ jobs:
       - name: Zip build artifacts
         run: |
           cd artifacts
-          for dir in AstroKernel-*; do
+          for dir in PrimeKernel-*; do
             ( cd "$dir" && zip -r "../${dir}.zip" . )
           done
 
@@ -129,7 +122,7 @@ jobs:
         with:
           body_path: version.txt
           tag_name: "${{ needs.prepare.outputs.release_ts }}"
-          name: "AstroKernel-${{ needs.prepare.outputs.release_ts }}"
+          name: "PrimeKernel-${{ needs.prepare.outputs.release_ts }}"
           files: artifacts/*.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
